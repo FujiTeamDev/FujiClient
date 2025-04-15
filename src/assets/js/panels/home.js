@@ -28,7 +28,7 @@ RPC.on('ready', async () => {
         startTimestamp: startingTime,
         largeImageKey: 'icon',
         smallImageKey: 'verificado',
-        largeImageText: `Miguelki Network`,
+        largeImageText: `Fuji Client`,
         instance: true,
         buttons: [
             {
@@ -813,7 +813,7 @@ class Home {
                         startTimestamp: startingTime,
                         largeImageKey: 'icon',
                         smallImageKey: 'verificado',
-                        largeImageText: `Miguelki Network`,
+                        largeImageText: `Fuji Client`,
                         instance: true,
                         buttons: [
                             {
@@ -955,7 +955,7 @@ class Home {
                     startTimestamp: startingTime,
                     largeImageKey: 'icon',
                     smallImageKey: 'verificado',
-                    largeImageText: `Miguelki Network`,
+                    largeImageText: `Fuji Client`,
                     instance: true,
                     buttons: [
                         {
@@ -983,7 +983,7 @@ class Home {
                         startTimestamp: startingTime,
                         largeImageKey: 'icon',
                         smallImageKey: 'verificado',
-                        largeImageText: `Miguelki Network`,
+                        largeImageText: `Fuji Client`,
                         instance: true,
                         buttons: [
                             {
@@ -1023,7 +1023,7 @@ class Home {
                         state: `En el launcher`,
                         largeImageKey: 'icon',
                         smallImageKey: 'verificado',
-                        largeImageText: `Miguelki Network`,
+                        largeImageText: `Fuji Client`,
                         instance: true,
                         buttons: [
                             {
