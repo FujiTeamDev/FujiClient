@@ -6,7 +6,7 @@ import { config, database, changePanel, appdata, setStatus, setInstanceBackgroun
 import { getHWID, checkHWID, getFetchError, playMSG, playquitMSG, addInstanceMSG, installMKLibMods, hideFolder, killMinecraftProcess } from '../MKLib.js';
 import cleanupManager from '../utils/cleanup-manager.js';
 
-const clientId = '1307003977442787451';
+const clientId = '1361701612162388053';
 const DiscordRPC = require('discord-rpc');
 const RPC = new DiscordRPC.Client({ transport: 'ipc' });
 const fs = require('fs');
