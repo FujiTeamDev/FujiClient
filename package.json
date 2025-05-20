@@ -1,7 +1,7 @@
 {
     "name": "Fuji-Client",
     "preductname": "Fuji Client",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "sub_version": "",
     "changelog": "Se ha rediseñado el panel de settings y se ha reescrito el sistema de configuración.",
     "description": "Launcher de minecraft para los servidores de Fuji Team",
