@@ -1,9 +1,9 @@
 {
     "name": "Fuji-Client",
     "preductname": "Fuji Client",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "sub_version": "",
-    "changelog": "Se ha rediseñado el panel de settings y se ha reescrito el sistema de configuración.",
+    "changelog": "Actualizada la API interna y mejoras de rendimiento.",
     "description": "Launcher de minecraft para los servidores de Fuji Team",
     "main": "src/app.js",
     "author": {
@@ -11,16 +11,12 @@
         "email": "admin@miguelkinetwork.fun",
         "url": "https://github.com/miguelkix30"
     },
-    "url": "http://fuji.miguelkinetwork.info/",
+    "url": "http://fuji.miguelkiwebservices.com/",
     "store_url": "https://minecraft.miguelkinetwork.info/shop/",
     "azuriom_url": "https://minecraft.miguelkinetwork.info/",
     "discord_url": "https://discord.gg/MCz6UsDDvV",
     "discord_client_id": "1361701612162388053",
-    "scripts": {
-        "start": "cross-env-shell NODE_ENV=dev electron .",
-        "dev": "cross-env-shell DEV_TOOL=open nodemon --exec npm start",
         "build": "node build.js --obf=true --build=platform",
-        "icon": "node build.js --icon=https://github.com/FujiTeamDev/FujiClient/master/src/assets/images/icon.png"
     },
     "license": "CCANC",
     "nodemonConfig": {
