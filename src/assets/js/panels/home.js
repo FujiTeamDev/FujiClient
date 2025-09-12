@@ -11,8 +11,6 @@ import {
 	setInstanceBackground,
 	pkg,
 	popup,
-	clickHead,
-	getClickeableHead,
 	toggleModsForInstance,
 	discordAccount,
 	toggleMusic,
@@ -33,8 +31,7 @@ import {
 	playquitMSG,
 	addInstanceMSG,
 	installMKLibMods,
-	hideFolder,
-	killMinecraftProcess,
+	killMinecraftProcess
 } from "../MKLib.js";
 import cleanupManager from "../utils/cleanup-manager.js";
 import { downloadAssets } from "../utils/instance-manager.js";
@@ -81,7 +78,7 @@ RPC.login({ clientId }).catch((err) => {
 	);
 	rpcActive = false;
 });
-const { Client } = require("minecraft-launcher-core");
+const { Client } = require("miguelkinetworkmclauncher-core");
 const { shell, ipcRenderer } = require("electron");
 class Home {
 	static id = "home";
@@ -124,37 +121,49 @@ class Home {
 	}
 
 	async showstore() {
-		let storebutton = document.querySelector(".storebutton");
 		let res = await config.GetConfig();
-		if (res.store_enabled) {
+		const shopButton = document.getElementById("shop");
+		
+		// Función para ocultar el botón
+		const hideShopButton = () => {
+			shopButton.style.display = "none";
+			shopButton.setAttribute("hidden", "");
+		};
+		
+		// Función para mostrar el botón
+		const showShopButton = () => {
+			shopButton.dataset.url = res.store_url;
+			shopButton.style.display = "flex";
+			shopButton.removeAttribute("hidden");
+		};
+		
+		// Verificar si la tienda está habilitada y la URL está disponible
+		if (res.store_enabled && res.store_url && res.store_url.trim() !== "") {
 			try {
-				const response = await fetch(pkg.store_url).catch((err) =>
-					console.error(
-						localization.t('home.store_offline')
-					)
-				);
+				console.log(`Verificando accesibilidad de la tienda: ${res.store_url}`);
+				const response = await fetch(res.store_url).catch((err) => {
+					console.error(localization.t('home.store_offline'));
+					throw err;
+				});
+				
 				if (response.ok) {
-					document.querySelector(".news-blockshop").style.display = "block";
+					showShopButton();
+					console.log("Botón de la tienda mostrado correctamente");
 				} else {
-					console.error(
-						localization.t('home.store_offline')
-					);
-					document.querySelector(".news-blockshop").style.display = "none";
+					console.error(localization.t('home.store_offline'));
+					hideShopButton();
 				}
 			} catch (error) {
-				console.error(
-					localization.t('home.store_offline')
-				);
-				document.querySelector(".news-blockshop").style.display = "none";
+				console.error(localization.t('home.store_offline'));
+				hideShopButton();
 			}
-			storebutton.addEventListener("click", (e) => {
-				ipcRenderer.send("create-store-window");
-			});
 		} else {
-			document.querySelector(".news-blockshop").style.display = "none";
-			console.log(
-				localization.t('home.store_disabled')
-			);
+			hideShopButton();
+			if (!res.store_enabled) {
+				console.log(localization.t('home.store_disabled'));
+			} else if (!res.store_url || res.store_url.trim() === "") {
+				console.log("URL de la tienda no configurada");
+			}
 		}
 	}
 
@@ -413,7 +422,15 @@ class Home {
 
 		socials.forEach((social) => {
 			social.addEventListener("click", (e) => {
-				shell.openExternal(e.target.dataset.url);
+				// Buscar el elemento que tenga el data-url, ya sea el target o su parent
+				let targetElement = e.target;
+				while (targetElement && !targetElement.dataset.url) {
+					targetElement = targetElement.parentElement;
+				}
+				
+				if (targetElement && targetElement.dataset.url) {
+					shell.openExternal(targetElement.dataset.url);
+				}
 			});
 		});
 	}
@@ -946,6 +963,7 @@ ${error.message}`,
 		instanceSelectBTN.disabled = true;
 		instanceSelectBTN.classList.add("disabled");
 		this.hideProgressBar();
+		this.hideSubProgressBar();
 
 		try {
 			const queueResult = await this.checkQueueStatus(hwid, username);
@@ -955,6 +973,7 @@ ${error.message}`,
 				infoStartingBOX.style.display = "none";
 				instanceSelectBTN.disabled = false;
 				instanceSelectBTN.classList.remove("disabled");
+				this.hideSubProgressBar();
 				ipcRenderer.send("main-window-progress-reset");
 				return;
 			}
@@ -965,6 +984,7 @@ ${error.message}`,
 			infoStartingBOX.style.display = "none";
 			instanceSelectBTN.disabled = false;
 			instanceSelectBTN.classList.remove("disabled");
+			this.hideSubProgressBar();
 			ipcRenderer.send("main-window-progress-reset");
 
 			let popupError = new popup();
@@ -1101,6 +1121,11 @@ ${error.message}`,
 
 		console.log("Configurando opciones de lanzamiento...");
 		let launcher = new Client();
+		
+		// Configurar logging avanzado para mejor diagnóstico
+		const performanceMetrics = this.setupAdvancedEventLogging(launcher);
+		console.log("🔧 Sistema de logging avanzado configurado para diagnóstico detallado");
+		
 		let launchConfig;
 
 		try {
@@ -1278,7 +1303,13 @@ ${error.message}`,
 					? this.config.dataDirectory
 					: `.${this.config.dataDirectory}`
 			}`;
-			
+
+			const resourcePath = path.join(
+				rootPath,
+				"resources",
+				`${options.loadder.loadder_type}-${options.loadder.minecraft_version}`
+			);
+
 			// Mostrar progreso de configuración
 			infoStarting.innerHTML = `${localization.t('home.configuring_loader')} ${options.loadder.loadder_type}...`;
 			this.setProgressBarDeterminate(0, 100);
@@ -1286,7 +1317,7 @@ ${error.message}`,
 			const loaderResult = await ipcRenderer.invoke('get-launcher-config', {
 				loaderType: options.loadder.loadder_type,
 				gameVersion: options.loadder.minecraft_version,
-				rootPath: rootPath
+				rootPath: resourcePath
 			});
 			
 			if (!loaderResult.success) {
@@ -1376,6 +1407,7 @@ ${error.message}`,
 			if (closeGameButton) closeGameButton.style.display = "none";
 			
 			// Limpiar barra de progreso
+			this.hideSubProgressBar();
 			ipcRenderer.send("main-window-progress-reset");
 			
 			// Mostrar error detallado al usuario
@@ -1392,13 +1424,16 @@ ${error.message}`,
 
 		let opt;
 		/* if (options.loadder.loadder_type == "forge") { */
-		
-		// Definir rootPath al inicio para uso en toda la configuración
 		const rootPath = `${await appdata()}/${
 			process.platform == "darwin"
 				? this.config.dataDirectory
 				: `.${this.config.dataDirectory}`
 		}`;
+		const resourcePath = path.join(
+			rootPath,
+			"resources",
+			`${options.loadder.loadder_type}-${options.loadder.minecraft_version}`
+		);
 		
 		// Establecer el gameDirectory correcto para la instancia
 		const instanceGameDirectory = `${rootPath}/instances/${options.name}`;
@@ -1423,7 +1458,8 @@ ${error.message}`,
 			path.join(instanceGameDirectory, 'resourcepacks'),
 			path.join(instanceGameDirectory, 'screenshots'),
 			path.join(instanceGameDirectory, 'logs'),
-			path.join(instanceGameDirectory, 'crash-reports')
+			path.join(instanceGameDirectory, 'crash-reports'),
+			resourcePath
 		];
 		
 		for (const dir of requiredDirs) {
@@ -1446,16 +1482,16 @@ ${error.message}`,
 				// Forzar el uso de OpenGL software rendering como fallback
 				'-Dorg.lwjgl.opengl.Display.allowSoftwareOpenGL=true',
 				// Configurar biblioteca nativa LWJGL
-				'-Dorg.lwjgl.librarypath=' + path.join(rootPath, 'bin', 'natives'),
+				'-Dorg.lwjgl.librarypath=' + path.join(resourcePath, 'natives', options.loadder.minecraft_version),
 				// Deshabilitar verificaciones de compatibilidad de LWJGL que pueden fallar
 				'-Dorg.lwjgl.util.NoChecks=true',
 				// Configurar OpenAL para compatibilidad
-				'-Dopenal.library=' + path.join(rootPath, 'bin', 'natives', process.platform === 'win32' ? 'OpenAL32.dll' : 'libopenal.so'),
+				'-Dopenal.library=' + path.join(resourcePath, 'natives', options.loadder.minecraft_version, process.platform === 'win32' ? 'OpenAL32.dll' : 'libopenal.so'),
 				// Argumentos para prevenir errores de memoria de LWJGL
 				'-Dorg.lwjgl.util.Debug=false',
 				// Configurar DirectX/OpenGL para Windows
 				...(process.platform === 'win32' ? [
-					'-Djava.library.path=' + path.join(rootPath, 'bin', 'natives'),
+					'-Djava.library.path=' + path.join(resourcePath, 'natives', options.loadder.minecraft_version),
 					'-Dsun.java2d.d3d=false',
 					'-Dsun.java2d.opengl=false'
 				] : [])
@@ -1576,8 +1612,10 @@ ${error.message}`,
 		
 		console.log(`👤 Usuario final para autenticación: "${authenticator.name}" (${authenticator.name.length} chars)`);
 		
-		// Configuración específica para minecraft-launcher-core
+		// Configuración específica para miguelkinetworkmclauncher-core
 		opt = {
+			// Directorio raíz donde se almacenan los archivos del launcher
+			root: resourcePath,
 			// Configuración base de tomate-loaders
 			...launchConfig,
 			
@@ -1587,36 +1625,34 @@ ${error.message}`,
 			// Timeout para conexiones
 			timeout: 10000,
 			
-			// Directorio raíz donde se almacenan los archivos del launcher
-			root: instanceGameDirectory,
 			
 			// Nombre de la instancia
 			instance: options.name,
 			
-			// Configuración de versión
+			/* // Configuración de versión
 			version: {
 				number: options.loadder.minecraft_version,
 				type: "release",
 				custom: options.loadder.custom_version
-			},
+			}, */
 			
 			// Configuración de proceso separado
 			detached: configClient.launcher_config.closeLauncher == "close-all" ? false : true,
 
-			// Configuración del loader (Forge/Fabric/Quilt)
+			/* // Configuración del loader (Forge/Fabric/Quilt)
 			loader: {
 				type: options.loadder.loadder_type,
 				build: options.loadder.loadder_version,
 				enable: options.loadder.loadder_type !== "none" && options.loadder.loadder_type !== "vanilla"
-			},
+			}, */
 			
-			// Para Forge específicamente, usar el campo forge si está disponible
+			/* // Para Forge específicamente, usar el campo forge si está disponible
 			...(options.loadder.loadder_type === "forge" && launchConfig.forge ? { forge: launchConfig.forge } : {}),
-
+ */
 			// Configuración de Java - usar la ruta verificada/descargada
 			javaPath: javaPath,
 			
-			// Configuración alternativa para minecraft-launcher-core (algunas versiones usan java en vez de javaPath)
+			// Configuración alternativa para miguelkinetworkmclauncher-core (algunas versiones usan java en vez de javaPath)
 			java: javaPath,
 
 			// Argumentos personalizados de JVM (incluir argumentos legacy si es necesario)
@@ -1645,13 +1681,13 @@ ${error.message}`,
 				// Directorio donde el juego genera saves, resource packs, etc.
 				gameDirectory: instanceGameDirectory,
 				// Directorio donde están los archivos del Minecraft jar y version json
-				directory: launchConfig.directory || path.join(rootPath, 'versions', options.loadder.minecraft_version),
+				/* directory: launchConfig.directory || path.join(rootPath, 'versions', options.loadder.minecraft_version),
 				// Directorio de nativos
 				natives: path.join(rootPath, 'bin', 'natives'),
 				// Directorio de assets
 				assetRoot: path.join(rootPath, 'assets'),
 				// Directorio de librerías
-				libraryRoot: path.join(rootPath, 'libraries'),
+				libraryRoot: path.join(rootPath, 'libraries'), */
 				// Directorio de trabajo para el proceso Java
 				cwd: instanceGameDirectory,
 				detached: configClient.launcher_config.closeLauncher == "close-all" ? false : true,
@@ -1702,54 +1738,355 @@ ${error.message}`,
 
 	launcher.launch(opt);
 		
-		
+		/*
+		 * === CONFIGURACIÓN DE EVENTOS MEJORADA ===
+		 * 
+		 * Se ha actualizado el manejo de eventos para usar los nuevos emits de miguelkinetworkmclauncher-core
+		 * que proporcionan información más detallada y mejor estructura de datos.
+		 * 
+		 * Eventos implementados:
+		 * - debug: Información de diagnóstico detallada
+		 * - progress: Progreso con estructura mejorada (type, task, current, total, message)
+		 * - download-status: Estado de descarga con porcentajes y tipos específicos
+		 * - download-start/complete/error: Eventos específicos de descarga
+		 * - minecraft-started: Cuando Minecraft inicia exitosamente
+		 * - minecraft-log: Logs en tiempo real del juego
+		 * - minecraft-closed: Cuando Minecraft se cierra
+		 * - arguments: Argumentos finales de lanzamiento
+		 * - error: Manejo de errores mejorado con tipos específicos
+		 * 
+		 * También mantiene compatibilidad con eventos legacy para versiones anteriores.
+		 */
 		
 		infoStarting.innerHTML = localization.t('home.verifying_files');
 		//barra de carga indeterminada
 		this.setProgressBarIndeterminate();
 
+		// Evento de debug para información detallada de diagnóstico
+		launcher.on("debug", (message) => {
+			console.log(`[LAUNCHER-DEBUG] ${message}`);
+		});
+
+		// Evento package-extract para extracción de paquetes
+		launcher.on("package-extract", (extracted) => {
+			console.log('Package extract event received:', extracted);
+			ipcRenderer.send("main-window-progress-load");
+			infoStarting.innerHTML = localization.t('home.extracting_files');
+			this.setProgressBarIndeterminate();
+		});
+
+		// Evento extract (legacy) para compatibilidad
 		launcher.on("extract", (extract) => {
 			console.log('Extract event received:', extract);
 			ipcRenderer.send("main-window-progress-load");
 			infoStarting.innerHTML = localization.t('home.extracting_files');
 		});
-		// emitir todos los conteniddos de el evento progress
-		// no solo el porcentaje
-		launcher.on("progress", (type, task, total) => {
-			if (type === "assets") {
-				// Validar que los valores sean números finitos válidos
-				const safeTask = (typeof task === 'number' && isFinite(task)) ? Math.max(0, task) : 0;
+
+		// Evento progress actualizado con nueva estructura
+		launcher.on("progress", (progress) => {
+			// Verificar si es la estructura nueva con objeto
+			if (typeof progress === 'object' && progress.type) {
+				const { type, task, current, total, message } = progress;
+				const safeProgress = (typeof current === 'number' && isFinite(current)) ? Math.max(0, current) : 0;
 				const safeTotal = (typeof total === 'number' && isFinite(total)) ? Math.max(1, total) : 1;
-				const safePercentage = safeTotal > 0 ? ((safeTask / safeTotal) * 100).toFixed(0) : '0';
+				const percentage = safeTotal > 0 ? ((safeProgress / safeTotal) * 100).toFixed(0) : '0';
+
+				console.log(`[PROGRESS] ${type} - ${task}: ${safeProgress}/${safeTotal} (${percentage}%)`);
+
+				// Usar el mensaje proporcionado o generar uno basado en el tipo
+				if (message) {
+					infoStarting.innerHTML = message;
+				} else {
+					switch (type) {
+						case 'launch':
+							switch (task) {
+								case 'initialization':
+									infoStarting.innerHTML = localization.t('home.initializing');
+									break;
+								case 'java-check':
+									infoStarting.innerHTML = localization.t('home.checking_java');
+									break;
+								case 'directory-setup':
+									infoStarting.innerHTML = localization.t('home.setting_directories');
+									break;
+								case 'package-extraction':
+									infoStarting.innerHTML = localization.t('home.extracting_packages');
+									break;
+								case 'version-setup':
+									infoStarting.innerHTML = localization.t('home.setting_version');
+									break;
+								case 'jar-download':
+									infoStarting.innerHTML = localization.t('home.downloading_minecraft');
+									break;
+								case 'mod-processing':
+									infoStarting.innerHTML = localization.t('home.processing_mods');
+									break;
+								case 'jvm-setup':
+									infoStarting.innerHTML = localization.t('home.configuring_jvm');
+									break;
+								case 'assets-download':
+									infoStarting.innerHTML = localization.t('home.downloading_assets');
+									break;
+								case 'launch-options':
+									infoStarting.innerHTML = localization.t('home.configuring_launch');
+									break;
+								case 'final-preparation':
+									infoStarting.innerHTML = localization.t('home.final_preparation');
+									break;
+								case 'starting-minecraft':
+									infoStarting.innerHTML = localization.t('home.starting_minecraft');
+									break;
+								default:
+									infoStarting.innerHTML = `${localization.t('home.launching')} - ${task}`;
+							}
+							break;
+						case 'assets':
+							infoStarting.innerHTML = `${localization.t('home.downloading_assets')} ${percentage}% (${safeProgress}/${safeTotal})`;
+							break;
+						case 'assets-copy':
+							infoStarting.innerHTML = `${localization.t('home.copying_assets')} ${percentage}% (${safeProgress}/${safeTotal})`;
+							break;
+						case 'natives':
+							infoStarting.innerHTML = `${localization.t('home.downloading_natives')} ${percentage}% (${safeProgress}/${safeTotal})`;
+							break;
+						case 'classes':
+						case 'classes-custom':
+						case 'classes-maven-custom':
+							infoStarting.innerHTML = `${localization.t('home.downloading_libraries')} ${percentage}% (${safeProgress}/${safeTotal})`;
+							break;
+						default:
+							infoStarting.innerHTML = `${localization.t('home.preparing')} ${type} ${percentage}%`;
+					}
+				}
+
+				// Actualizar barra de progreso según el tipo
+				if (['assets', 'assets-copy', 'natives', 'classes', 'classes-custom', 'classes-maven-custom'].includes(type)) {
+					ipcRenderer.send("main-window-progress", { progress: safeProgress, size: safeTotal });
+					this.setProgressBarDeterminate(safeProgress, safeTotal);
+				} else {
+					ipcRenderer.send("main-window-progress-load");
+					this.setProgressBarIndeterminate();
+				}
 				
-				infoStarting.innerHTML = `${localization.t('home.downloading_assets')} ${safePercentage}% (${safeTask}/${safeTotal})`;
-				ipcRenderer.send("main-window-progress", { progress: safeTask, size: safeTotal });
-				this.setProgressBarDeterminate(safeTask, safeTotal);
-			} else if (type === "assets-copy") {
-				// Validar que los valores sean números finitos válidos
-				const safeTask = (typeof task === 'number' && isFinite(task)) ? Math.max(0, task) : 0;
-				const safeTotal = (typeof total === 'number' && isFinite(total)) ? Math.max(1, total) : 1;
-				const safePercentage = safeTotal > 0 ? ((safeTask / safeTotal) * 100).toFixed(0) : '0';
-				infoStarting.innerHTML = `${localization.t('home.copying_assets')} ${safePercentage}% (${safeTask}/${safeTotal})`;
-				ipcRenderer.send("main-window-progress", { progress: safeTask, size: safeTotal });
-				this.setProgressBarDeterminate(safeTask, safeTotal);
-			} else if (type === "natives") {
-				// Validar que los valores sean números finitos válidos
-				const safeTask = (typeof task === 'number' && isFinite(task)) ? Math.max(0, task) : 0;
-				const safeTotal = (typeof total === 'number' && isFinite(total)) ? Math.max(1, total) : 1;
-				const safePercentage = safeTotal > 0 ? ((safeTask / safeTotal) * 100).toFixed(0) : '0';
-				infoStarting.innerHTML = `${localization.t('home.downloading_natives')} ${safePercentage}% (${safeTask}/${safeTotal})`;
-				ipcRenderer.send("main-window-progress", { progress: safeTask, size: safeTotal });
-				this.setProgressBarDeterminate(safeTask, safeTotal);
+				// Ocultar sub-barra para eventos progress generales (no específicos de archivos individuales)
+				this.hideSubProgressBar();
 			} else {
-				infoStarting.innerHTML = `${localization.t('home.verifying')}...`;
-				ipcRenderer.send("main-window-progress-load");
-				//barra de carga indeterminada
-				this.setProgressBarIndeterminate();
+				// Mantener compatibilidad con estructura legacy (type, task, total)
+				const type = arguments[0];
+				const task = arguments[1]; 
+				const total = arguments[2];
+				
+				if (type === "assets") {
+					const safeTask = (typeof task === 'number' && isFinite(task)) ? Math.max(0, task) : 0;
+					const safeTotal = (typeof total === 'number' && isFinite(total)) ? Math.max(1, total) : 1;
+					const safePercentage = safeTotal > 0 ? ((safeTask / safeTotal) * 100).toFixed(0) : '0';
+					
+					infoStarting.innerHTML = `${localization.t('home.downloading_assets')} ${safePercentage}% (${safeTask}/${safeTotal})`;
+					ipcRenderer.send("main-window-progress", { progress: safeTask, size: safeTotal });
+					this.setProgressBarDeterminate(safeTask, safeTotal);
+				} else if (type === "assets-copy") {
+					const safeTask = (typeof task === 'number' && isFinite(task)) ? Math.max(0, task) : 0;
+					const safeTotal = (typeof total === 'number' && isFinite(total)) ? Math.max(1, total) : 1;
+					const safePercentage = safeTotal > 0 ? ((safeTask / safeTotal) * 100).toFixed(0) : '0';
+					infoStarting.innerHTML = `${localization.t('home.copying_assets')} ${safePercentage}% (${safeTask}/${safeTotal})`;
+					ipcRenderer.send("main-window-progress", { progress: safeTask, size: safeTotal });
+					this.setProgressBarDeterminate(safeTask, safeTotal);
+				} else if (type === "natives") {
+					const safeTask = (typeof task === 'number' && isFinite(task)) ? Math.max(0, task) : 0;
+					const safeTotal = (typeof total === 'number' && isFinite(total)) ? Math.max(1, total) : 1;
+					const safePercentage = safeTotal > 0 ? ((safeTask / safeTotal) * 100).toFixed(0) : '0';
+					infoStarting.innerHTML = `${localization.t('home.downloading_natives')} ${safePercentage}% (${safeTask}/${safeTotal})`;
+					ipcRenderer.send("main-window-progress", { progress: safeTask, size: safeTotal });
+					this.setProgressBarDeterminate(safeTask, safeTotal);
+				} else {
+					infoStarting.innerHTML = `${localization.t('home.verifying')}...`;
+					ipcRenderer.send("main-window-progress-load");
+					this.setProgressBarIndeterminate();
+				}
 			}
 		});
 
 
+		// Evento download-status con nueva estructura
+		launcher.on("download-status", (status) => {
+			if (typeof status === 'object' && status.name) {
+				const { name, type, current, total, percentage, phaseProgress } = status;
+				const displayPercentage = percentage ? `${percentage.toFixed(1)}%` : `${Math.round((current/total)*100)}%`;
+				
+				console.log(`[DOWNLOAD] ${name} (${type}): ${displayPercentage} - ${current}/${total} bytes`);
+				
+				// Manejar progreso de la fase principal si está disponible
+				if (phaseProgress && phaseProgress.percentage !== undefined) {
+					const safePhasePercentage = Math.max(0, Math.min(100, phaseProgress.percentage || 0));
+					console.log(`[PHASE-PROGRESS] ${phaseProgress.message}: ${safePhasePercentage.toFixed(1)}% (${phaseProgress.current}/${phaseProgress.total})`);
+					
+					// Actualizar barra de progreso principal con el progreso de la fase
+					this.setProgressBarDeterminate(safePhasePercentage, 100);
+					// SIEMPRE enviar el progreso TOTAL (de la fase) a main-window-progress
+					ipcRenderer.send("main-window-progress", { 
+						progress: safePhasePercentage, 
+						size: 100 
+					});
+					
+					// Mostrar información de la fase en el texto principal
+					infoStarting.innerHTML = phaseProgress.message || localization.t('home.downloading_assets');
+					// Mostrar progreso del archivo individual en la sub-barra
+					const subProgressPercentage = percentage || Math.round((current/total)*100);
+					this.setSubProgressBar(subProgressPercentage, 100, `${name} - ${displayPercentage}`);
+				} else {
+					// Comportamiento legacy cuando no hay información de fase
+					switch (type) {
+						case "version-jar":
+							infoStarting.innerHTML = `${localization.t('home.downloading_mc_version')} ${name}... ${displayPercentage}`;
+							break;
+						case "asset-json":
+							infoStarting.innerHTML = `${localization.t('home.downloading_assets_json')} ${name}... ${displayPercentage}`;
+							break;
+						case "assets":
+							infoStarting.innerHTML = `${localization.t('home.downloading_assets')} ${name} ${displayPercentage}`;
+							break;
+						case "natives":
+							infoStarting.innerHTML = `${localization.t('home.downloading_natives')} ${name} ${displayPercentage}`;
+							break;
+						case "classes":
+						case "classes-custom":
+						case "classes-maven-custom":
+							infoStarting.innerHTML = `${localization.t('home.downloading_libraries')} ${name} ${displayPercentage}`;
+							break;
+						case "log4j":
+							infoStarting.innerHTML = `${localization.t('home.downloading_log4j')} ${name} ${displayPercentage}`;
+							break;
+						default:
+							infoStarting.innerHTML = `${localization.t('downloading')} ${name} ${displayPercentage}`;
+					}
+					
+					// Para legacy: enviar progreso del archivo individual tanto a la barra principal como a main-window-progress
+					ipcRenderer.send("main-window-progress", { progress: current, size: total });
+					this.setProgressBarDeterminate(current, total);
+					
+					// Ocultar la sub-barra si no hay información de fase
+					this.hideSubProgressBar();
+				}
+			} else {
+				// Mantener compatibilidad con estructura legacy (name, type, current, total)
+				const name = arguments[0];
+				const type = arguments[1];
+				const current = arguments[2];
+				const total = arguments[3];
+				
+				// Ocultar la sub-barra para eventos legacy
+				this.hideSubProgressBar();
+				
+				if (type === "version-jar") {
+					infoStarting.innerHTML = `${localization.t('home.downloading_mc_version')} ${name}... (${current}/${total})`;
+					ipcRenderer.send("main-window-progress", { progress: current, size: total });
+					this.setProgressBarDeterminate(current, total);
+				} else if (type === "asset-json") {
+					infoStarting.innerHTML = `${localization.t('home.downloading_assets_json')} ${name}... (${current}/${total})`;
+					ipcRenderer.send("main-window-progress", { progress: current, size: total });
+					this.setProgressBarDeterminate(current, total);
+				} else if (type === "assets") {
+					infoStarting.innerHTML = `${localization.t('home.downloading_natives')} ${name} (${current}/${total})`;
+					ipcRenderer.send("main-window-progress", { progress: current, size: total });
+					this.setProgressBarDeterminate(current, total);
+				} else if (type === "log4j") {
+					infoStarting.innerHTML = `${localization.t('home.downloading_log4j')} ${name} (${current}/${total})`;
+					ipcRenderer.send("main-window-progress", { progress: current, size: total });
+					this.setProgressBarDeterminate(current, total);
+				} else {
+					infoStarting.innerHTML = `${localization.t('downloading')} ${name} (${current}/${total})`;
+					ipcRenderer.send("main-window-progress", { progress: current, size: total });
+					this.setProgressBarDeterminate(current, total);
+				}
+			}
+		});
+
+		// Evento download-start para cuando comienza una descarga
+		launcher.on("download-start", (downloadInfo) => {
+			console.log(`[DOWNLOAD-START] ${downloadInfo.file} - ${downloadInfo.totalBytes} bytes`);
+			
+			// Manejar progreso de la fase si está disponible
+			if (downloadInfo.phaseProgress && downloadInfo.phaseProgress.percentage !== undefined) {
+				const safePhasePercentage = Math.max(0, Math.min(100, downloadInfo.phaseProgress.percentage || 0));
+				console.log(`[PHASE-START] ${downloadInfo.phaseProgress.message}: ${safePhasePercentage.toFixed(1)}%`);
+				
+				// Actualizar barra principal con progreso de fase
+				this.setProgressBarDeterminate(safePhasePercentage, 100);
+				// SOLO enviar progreso TOTAL de la fase a main-window-progress
+				ipcRenderer.send("main-window-progress", { 
+					progress: safePhasePercentage, 
+					size: 100 
+				});
+				
+				// Mostrar información de la fase
+				infoStarting.innerHTML = downloadInfo.phaseProgress.message || localization.t('home.downloading_assets');
+				
+				// Mostrar que se está iniciando la descarga del archivo
+				this.setSubProgressBar(0, 100, `Iniciando ${downloadInfo.file}...`);
+			}
+		});
+
+		// Evento download-complete para cuando se completa una descarga
+		launcher.on("download-complete", (downloadInfo) => {
+			console.log(`[DOWNLOAD-COMPLETE] ${downloadInfo.file} completado`);
+			
+			// Manejar progreso de la fase si está disponible
+			if (downloadInfo.phaseProgress && downloadInfo.phaseProgress.percentage !== undefined) {
+				const safePhasePercentage = Math.max(0, Math.min(100, downloadInfo.phaseProgress.percentage || 0));
+				console.log(`[PHASE-COMPLETE] ${downloadInfo.phaseProgress.message}: ${safePhasePercentage.toFixed(1)}%`);
+				
+				// Actualizar barra principal con progreso de fase
+				this.setProgressBarDeterminate(safePhasePercentage, 100);
+				// SOLO enviar progreso TOTAL de la fase a main-window-progress
+				ipcRenderer.send("main-window-progress", { 
+					progress: safePhasePercentage, 
+					size: 100 
+				});
+				
+				// Actualizar información de la fase
+				infoStarting.innerHTML = downloadInfo.phaseProgress.message || localization.t('home.downloading_assets');
+				
+				// Mostrar que se completó la descarga del archivo
+				this.setSubProgressBar(100, 100, `✓ ${downloadInfo.file} completado`);
+			}
+		});
+
+		// Evento download-error para errores de descarga
+		launcher.on("download-error", (error) => {
+			console.error(`[DOWNLOAD-ERROR] ${error.file}: ${error.error}`);
+			
+			// Manejar progreso de la fase si está disponible
+			if (error.phaseProgress && error.phaseProgress.percentage !== undefined) {
+				const safePhasePercentage = Math.max(0, Math.min(100, error.phaseProgress.percentage || 0));
+				console.log(`[PHASE-ERROR] ${error.phaseProgress.message}: ${safePhasePercentage.toFixed(1)}%`);
+				
+				// Actualizar barra principal con progreso de fase
+				this.setProgressBarDeterminate(safePhasePercentage, 100);
+				// SOLO enviar progreso TOTAL de la fase a main-window-progress
+				ipcRenderer.send("main-window-progress", { 
+					progress: safePhasePercentage, 
+					size: 100 
+				});
+				
+				// Actualizar información de la fase
+				infoStarting.innerHTML = error.phaseProgress.message || localization.t('home.downloading_assets');
+				
+				// Mostrar error en la sub-barra
+				if (error.retry) {
+					console.log(`[DOWNLOAD-RETRY] Reintentando descarga de ${error.file}...`);
+					this.setSubProgressBar(0, 100, `Reintentando ${error.file}...`);
+				} else {
+					this.setSubProgressBar(0, 100, `❌ Error: ${error.file}`);
+				}
+			} else {
+				// Comportamiento legacy
+				if (error.retry) {
+					console.log(`[DOWNLOAD-RETRY] Reintentando descarga de ${error.file}...`);
+				}
+			}
+		});
+
+		// Mantener compatibilidad con evento download_status legacy
 		launcher.on("download_status", (name, type, current, total) => {
 			if (type === "version-jar") {
 				infoStarting.innerHTML = `${localization.t('home.downloading_mc_version')} ${name}... (${current}/${total})`;
@@ -1785,11 +2122,199 @@ ${error.message}`,
 			this.setProgressBarDeterminate(safeProgress, safeSize);
 		});
 
+		// Evento arguments para mostrar los argumentos de lanzamiento
+		launcher.on("arguments", (args) => {
+			console.log(`[LAUNCH-ARGS] Argumentos de lanzamiento:`, args.join(' '));
+		});
+
+		// Evento minecraft-started cuando el proceso de Minecraft se inicia exitosamente
+		launcher.on("minecraft-started", async (info) => {
+			console.log(`[MINECRAFT-STARTED] PID: ${info.pid}, Directorio: ${info.cwd}`);
+			
+			// Actualizar Discord RPC
+			if (rpcActive) {
+				username = await getUsername();
+				RPC.setActivity({
+					state: `${localization.t('rpc.playing')} ${configClient.instance_selct}`,
+					startTimestamp: startingTime,
+					largeImageKey: "icon",
+					smallImageKey: `https://minotar.net/helm/${username}/512.png`,
+					smallImageText: username,
+					largeImageText: pkg.productname,
+					instance: true,
+				});
+			}
+
+			// Marcar que el juego está corriendo
+			playing = true;
+			playMSG(configClient.instance_selct);
+			removeUserFromQueue(hwid);
+
+			// Ocultar barra de progreso y mostrar estado de juego
+			this.hideProgressBar();
+			this.hideSubProgressBar();
+			closeGameButton.style.display = "block";
+			infoStarting.innerHTML = localization.t('home.playing');
+			ipcRenderer.send("main-window-progress-load");
+
+			// Manejar música
+			if (!musicMuted && musicPlaying) {
+				musicMuted = false;
+				fadeOutAudio();
+			}
+
+			// Ocultar launcher si está configurado
+			if (configClient.launcher_config.closeLauncher == "close-launcher") {
+				ipcRenderer.send("main-window-hide");
+			}
+		});
+
+		// Evento minecraft-log para logs en tiempo real de Minecraft
+		launcher.on("minecraft-log", (log) => {
+			console.log(`[MINECRAFT-${log.type.toUpperCase()}] ${log.message}`);
+
+			// Procesar la salida para detectar patrones de limpieza si la limpieza está activada
+			if (
+				options.cleaning &&
+				options.cleaning.enabled &&
+				cleanupManager.enabled
+			) {
+				cleanupManager.processGameOutput(options.name, log.message);
+
+				// Si el juego ya se inició completamente y no hemos ejecutado la limpieza
+				if (
+					cleanupManager.isGameFullyStarted(options.name) &&
+					!cleanupTriggered
+				) {
+					cleanupTriggered = true;
+					console.log(
+						`Juego completamente iniciado. Ejecutando limpieza de archivos para: ${options.name}`
+					);
+
+					try {
+						setTimeout(async () => {
+							await cleanupManager.performStartupCleanup(options.name);
+							console.log(
+								`Limpieza de archivos completada para: ${options.name}`
+							);
+						}, 5000);
+					} catch (error) {
+						console.error(
+							`Error durante la limpieza de archivos: ${error.message}`
+						);
+					}
+				}
+
+				if (!gameStartMonitoringStarted) {
+					gameStartMonitoringStarted = true;
+					console.log(
+						`Monitoreo de inicio del juego activado para: ${options.name}`
+					);
+				}
+			}
+
+			// Aplicar mods opcionales si aún no se han aplicado
+			if (!modsApplied) {
+				modsApplied = true;
+				try {
+					infoStarting.innerHTML = localization.t('home.applying_optional_mods');
+					this.applyOptionalMods(options.name).then(() => {
+						console.log(`Mods opcionales aplicados para: ${options.name}`);
+					}).catch((error) => {
+						console.error(`Error al aplicar mods opcionales: ${error}`);
+					});
+				} catch (error) {
+					console.error(`Error al aplicar mods opcionales: ${error}`);
+				}
+			}
+
+			// Limpiar librerías especiales cuando el juego se conecta
+			if (
+				!specialModCleaned &&
+				(log.message.includes("Setting user:") ||
+					log.message.includes("Connecting to") ||
+					log.message.includes("LWJGL Version:") ||
+					log.message.includes("OpenAL initialized"))
+			) {
+				specialModCleaned = true;
+				try {
+					setTimeout(async () => {
+						const basePath = `${await appdata()}/${
+							process.platform == "darwin"
+								? this.config.dataDirectory
+								: `.${this.config.dataDirectory}`
+						}`;
+						await cleanupManager.cleanMKLibMods(options.name, basePath);
+					}, 5000);
+				} catch (cleanError) {
+					console.error("Error al limpiar las librerías extra:", cleanError);
+				}
+			}
+		});
+
+		// Evento minecraft-closed cuando Minecraft se cierra
+		launcher.on("minecraft-closed", async (info) => {
+			console.log(`[MINECRAFT-CLOSED] Código de salida: ${info.code}, Señal: ${info.signal || 'N/A'}`);
+			
+			setGameFinished();
+
+			this.notification();
+			if (!musicMuted && !musicPlaying) {
+				musicPlaying = true;
+				setBackgroundMusic(options.backgroundMusic);
+			}
+			infoStartingBOX.style.display = "none";
+			playInstanceBTN.style.display = "flex";
+			instanceSelectBTN.disabled = false;
+			instanceSelectBTN.classList.remove("disabled");
+			infoStarting.innerHTML = localization.t('home.closing');
+
+			if (closeGameButton) {
+				closeGameButton.style.display = "none";
+			}
+
+			if (configClient.launcher_config?.closeLauncher == "close-launcher") {
+				ipcRenderer.send("main-window-show");
+			}
+
+			this.enablePlayButton();
+
+			// Ejecutar limpieza en cierre si está configurada
+			if (
+				options.cleaning &&
+				options.cleaning.enabled &&
+				cleanupManager.enabled
+			) {
+				try {
+					await cleanupManager.cleanupOnGameClose(options.name);
+					console.log(
+						`Limpieza en cierre del juego completada para: ${options.name}`
+					);
+				} catch (error) {
+					console.error(`Error durante limpieza en cierre: ${error.message}`);
+				}
+			}
+
+			if (rpcActive) {
+				username = await getUsername();
+				RPC.setActivity({
+					state: `En el launcher`,
+					startTimestamp: startingTime,
+					largeImageKey: "icon",
+					largeImageText: pkg.productname,
+					instance: true,
+				}).catch();
+				playquitMSG(configClient.instance_selct);
+				playing = false;
+			}
+		});
+
+		// Mantener evento data para compatibilidad legacy
 		launcher.on("data", async (e) => {
 			if (typeof e === "string") {
 				console.log(e);
 
-				if (rpcActive) {
+				if (rpcActive && !playing) {
 					username = await getUsername();
 					RPC.setActivity({
 						state: `${localization.t('rpc.playing')} ${configClient.instance_selct}`,
@@ -1808,10 +2333,8 @@ ${error.message}`,
 					options.cleaning.enabled &&
 					cleanupManager.enabled
 				) {
-					// Procesa la salida para detectar patrones que indiquen que el juego se inició completamente
 					cleanupManager.processGameOutput(options.name, e);
 
-					// Si el juego ya se inició completamente y no hemos ejecutado la limpieza
 					if (
 						cleanupManager.isGameFullyStarted(options.name) &&
 						!cleanupTriggered
@@ -1822,7 +2345,6 @@ ${error.message}`,
 						);
 
 						try {
-							// Esperar un poco para asegurar que el juego esté estable
 							setTimeout(async () => {
 								await cleanupManager.performStartupCleanup(options.name);
 								console.log(
@@ -1884,6 +2406,7 @@ ${error.message}`,
 				fadeOutAudio();
 			}
 			this.hideProgressBar();
+			this.hideSubProgressBar();
 			closeGameButton.style.display = "block";
 
 			if (!playing) {
@@ -1899,13 +2422,22 @@ ${error.message}`,
 			infoStarting.innerHTML = localization.t('home.playing');
 		});
 
+		// Evento patch para procesos de parcheo
 		launcher.on("patch", (patch) => {
-			console.log(patch);
+			console.log(`[PATCH] ${patch}`);
 			ipcRenderer.send("main-window-progress-load");
 			infoStarting.innerHTML = localization.t('home.patching');
+			this.setProgressBarIndeterminate();
 		});
 
+		// Evento close con compatibilidad para la nueva estructura
 		launcher.on("close", async (code) => {
+			// Verificar si es la nueva estructura con objeto o el código legacy
+			const exitCode = typeof code === 'object' ? code.code : code;
+			const signal = typeof code === 'object' ? code.signal : null;
+			
+			console.log(`[GAME-CLOSE] Código de salida: ${exitCode}, Señal: ${signal || 'N/A'}`);
+			
 			setGameFinished();
 
 			this.notification();
@@ -1960,12 +2492,13 @@ ${error.message}`,
 			}
 		});
 
+		// Evento error con nueva estructura detallada
 		launcher.on("error", async (err) => {
 			console.error("Error del launcher:", err);
 			removeUserFromQueue(hwid);
 
 			// Marcar que el juego ha terminado debido a error
-			setGameStopped();
+			setGameFinished();
 			console.log("❌ Error en el launcher, Java liberado");
 
 			// Restablecer estado de UI
@@ -1979,6 +2512,7 @@ ${error.message}`,
 			if (closeGameButton) closeGameButton.style.display = "none";
 			
 			// Limpiar progreso
+			this.hideSubProgressBar();
 			ipcRenderer.send("main-window-progress-reset");
 			
 			// Restablecer música
@@ -1996,36 +2530,67 @@ ${error.message}`,
 				ipcRenderer.send("main-window-show");
 			}
 
-			// Determinar tipo de error y mensaje apropiado
+			// Determinar tipo de error y mensaje apropiado basado en la nueva estructura
 			let errorTitle = "Error al Iniciar el Juego";
 			let errorContent = "Ha ocurrido un error inesperado al iniciar el juego.";
 			
-			if (typeof err.error === "undefined") {
-				// Error sin mensaje específico - posiblemente problema de configuración
-				errorTitle = "Error de Configuración";
-				errorContent = `El juego no pudo iniciarse debido a un problema de configuración.<br><br>Posibles causas:<br>- Archivos del juego corruptos o faltantes<br>- Configuración de Java incorrecta<br>- Problemas con ${options.loadder.loadder_type}<br>- Falta de memoria RAM<br>Si el problema persiste, contacta al soporte técnico.`;
-			} else {
-				// Error con mensaje específico
-				let originalError = err.error;
+			// Verificar si es la nueva estructura de error con type y message
+			if (typeof err === 'object' && err.type && err.message) {
+				const { type, error: errorDetails, message, stack } = err;
 				
-				// Categorizar errores comunes
-				if (originalError.includes('OutOfMemoryError') || originalError.includes('heap')) {
-					errorTitle = "Error de Memoria";
-					errorContent = `El juego se quedó sin memoria RAM.<br><br>Soluciones:<br>- Incrementa la memoria máxima de Java en Configuración<br>- Cierra otros programas que consuman memoria<br>- Usa menos mods o un modpack más ligero<br>Error técnico: ${originalError}`;
-				} else if (originalError.includes('java') || originalError.includes('JVM')) {
-					errorTitle = "Error de Java";
-					errorContent = `Problema con la instalación de Java.<br><br>Soluciones:<br>- Verifica que Java esté instalado correctamente<br>- Reinstala Java desde el sitio oficial<br>- Verifica la ruta de Java en Configuración<br>Error técnico: ${originalError}`;
-				} else if (originalError.includes('connection') || originalError.includes('network')) {
-					errorTitle = "Error de Conexión";
-					errorContent = `No se pudo conectar al servidor.<br><br>Soluciones:<br>- Verifica tu conexión a internet<br>- El servidor puede estar temporalmente no disponible<br>- Verifica que no tengas firewall bloqueando el juego<br>Error técnico: ${originalError}`;
-				} else if (originalError.includes('mod') || originalError.includes('forge') || originalError.includes('fabric')) {
-					errorTitle = "Error de Mods";
-					errorContent = `Problema con mods o el mod loader.<br><br>Soluciones:<br>- Verifica que todos los mods sean compatibles<br>- Verifica que ${options.loadder.loadder_type} sea la versión correcta<br>- Intenta desactivar mods opcionales<br>Error técnico: ${originalError}`;
-				} else if (originalError.includes('file') || originalError.includes('path')) {
-					errorTitle = "Error de Archivos";
-					errorContent = `Problema con archivos del juego.<br><br>Soluciones:<br>- Ejecuta el launcher como administrador<br>- Verifica permisos de la carpeta del juego<br>- Verifica que hay suficiente espacio en disco<br>Error técnico: ${originalError}`;
+				console.log(`[ERROR-${type}] ${message}`);
+				if (stack) console.log(`[ERROR-STACK] ${stack}`);
+				
+				switch (type) {
+					case 'java-error':
+						errorTitle = "Error de Java";
+						errorContent = `${message}<br><br>Soluciones:<br>- Verifica que Java esté instalado correctamente<br>- Reinstala Java desde el sitio oficial<br>- Verifica la ruta de Java en Configuración<br><br>Detalles técnicos: ${errorDetails}`;
+						break;
+					case 'launch-error':
+						errorTitle = "Error de Lanzamiento";
+						errorContent = `${message}<br><br>Soluciones:<br>- Verifica los archivos del juego<br>- Incrementa la memoria de Java<br>- Ejecuta como administrador<br><br>Detalles técnicos: ${errorDetails}`;
+						break;
+					case 'spawn-error':
+						errorTitle = "Error de Proceso";
+						errorContent = `${message}<br><br>Soluciones:<br>- Verifica permisos del sistema<br>- Ejecuta como administrador<br>- Verifica antivirus/firewall<br><br>Detalles técnicos: ${errorDetails}`;
+						break;
+					case 'minecraft-process-error':
+						errorTitle = "Error del Proceso de Minecraft";
+						errorContent = `${message}<br><br>Soluciones:<br>- Verifica la configuración de mods<br>- Verifica la versión de Minecraft<br>- Revisa los logs del juego<br><br>Detalles técnicos: ${errorDetails}`;
+						break;
+					default:
+						errorTitle = `Error de ${type}`;
+						errorContent = `${message}<br><br>Detalles técnicos: ${errorDetails}`;
+				}
+			} else {
+				// Mantener compatibilidad con estructura legacy
+				if (typeof err.error === "undefined") {
+					// Error sin mensaje específico - posiblemente problema de configuración
+					errorTitle = "Error de Configuración";
+					errorContent = `El juego no pudo iniciarse debido a un problema de configuración.<br><br>Posibles causas:<br>- Archivos del juego corruptos o faltantes<br>- Configuración de Java incorrecta<br>- Problemas con ${options.loadder?.loadder_type || 'el mod loader'}<br>- Falta de memoria RAM<br><br>Si el problema persiste, contacta al soporte técnico.`;
 				} else {
-					errorContent = `${originalError}<br><br>Si el problema persiste, contacta al soporte técnico.`;
+					// Error con mensaje específico
+					let originalError = err.error;
+					
+					// Categorizar errores comunes
+					if (originalError.includes('OutOfMemoryError') || originalError.includes('heap')) {
+						errorTitle = "Error de Memoria";
+						errorContent = `El juego se quedó sin memoria RAM.<br><br>Soluciones:<br>- Incrementa la memoria máxima de Java en Configuración<br>- Cierra otros programas que consuman memoria<br>- Usa menos mods o un modpack más ligero<br><br>Error técnico: ${originalError}`;
+					} else if (originalError.includes('java') || originalError.includes('JVM')) {
+						errorTitle = "Error de Java";
+						errorContent = `Problema con la instalación de Java.<br><br>Soluciones:<br>- Verifica que Java esté instalado correctamente<br>- Reinstala Java desde el sitio oficial<br>- Verifica la ruta de Java en Configuración<br><br>Error técnico: ${originalError}`;
+					} else if (originalError.includes('connection') || originalError.includes('network')) {
+						errorTitle = "Error de Conexión";
+						errorContent = `No se pudo conectar al servidor.<br><br>Soluciones:<br>- Verifica tu conexión a internet<br>- El servidor puede estar temporalmente no disponible<br>- Verifica que no tengas firewall bloqueando el juego<br><br>Error técnico: ${originalError}`;
+					} else if (originalError.includes('mod') || originalError.includes('forge') || originalError.includes('fabric')) {
+						errorTitle = "Error de Mods";
+						errorContent = `Problema con mods o el mod loader.<br><br>Soluciones:<br>- Verifica que todos los mods sean compatibles<br>- Verifica que ${options.loadder?.loadder_type || 'el mod loader'} sea la versión correcta<br>- Intenta desactivar mods opcionales<br><br>Error técnico: ${originalError}`;
+					} else if (originalError.includes('file') || originalError.includes('path')) {
+						errorTitle = "Error de Archivos";
+						errorContent = `Problema con archivos del juego.<br><br>Soluciones:<br>- Ejecuta el launcher como administrador<br>- Verifica permisos de la carpeta del juego<br>- Verifica que hay suficiente espacio en disco<br><br>Error técnico: ${originalError}`;
+					} else {
+						errorContent = `${originalError}<br><br>Si el problema persiste, contacta al soporte técnico.`;
+					}
 				}
 			}
 
@@ -2057,6 +2622,27 @@ ${error.message}`,
 			this.notification();
 			infoStarting.innerHTML = `${localization.t('home.verifying')}...`;
 		});
+
+		// Eventos adicionales para mejor diagnóstico y funcionalidad
+
+		// Evento download para compatibilidad legacy
+		launcher.on("download", (fileName) => {
+			console.log(`[DOWNLOAD-LEGACY] Descarga completada: ${fileName}`);
+		});
+
+		// Evento check para validación de archivos
+		launcher.on("check", (progress, size) => {
+			// Validar que los valores sean números finitos válidos
+			const safeProgress = (typeof progress === 'number' && isFinite(progress)) ? Math.max(0, progress) : 0;
+			const safeSize = (typeof size === 'number' && isFinite(size)) ? Math.max(1, size) : 1;
+			const safePercentage = safeSize > 0 ? Math.min(100, ((safeProgress / safeSize) * 100)) : 0;
+			
+			console.log(`[FILE-CHECK] Verificando archivos: ${safeProgress}/${safeSize} (${safePercentage.toFixed(1)}%)`);
+			infoStarting.innerHTML = `${localization.t('home.verifying')}... ${safePercentage.toFixed(0)}%`;
+			ipcRenderer.send("main-window-progress", { progress: safeProgress, size: safeSize });
+			this.setProgressBarDeterminate(safeProgress, safeSize);
+		});
+		
 		
 		} catch (error) {
 			console.error("Error fatal en startGame:", error);
@@ -2077,6 +2663,7 @@ ${error.message}`,
 			if (closeGameButton) closeGameButton.style.display = "none";
 			
 			// Limpiar barra de progreso
+			this.hideSubProgressBar();
 			ipcRenderer.send("main-window-progress-reset");
 			
 			// Restablecer música si estaba silenciada
@@ -2894,6 +3481,39 @@ ${error.message}`,
 		}
 	}
 
+	// Funciones para manejar la segunda barra de progreso (sub-tareas)
+	setSubProgressBar(value = 0, max = 100, text = "") {
+		const subProgressContainer = document.querySelector(".sub-progress-container");
+		const subProgressBar = document.querySelector(".sub-progress-bar");
+		const subProgressText = document.querySelector(".sub-progress-text");
+		
+		if (subProgressContainer && subProgressBar && subProgressText) {
+			// Mostrar el contenedor si está oculto
+			subProgressContainer.style.display = "flex";
+			
+			// Actualizar la barra de progreso
+			subProgressBar.value = value;
+			subProgressBar.max = max;
+			
+			// Actualizar el texto
+			subProgressText.textContent = text;
+		}
+	}
+
+	hideSubProgressBar() {
+		const subProgressContainer = document.querySelector(".sub-progress-container");
+		if (subProgressContainer) {
+			subProgressContainer.style.display = "none";
+		}
+	}
+
+	showSubProgressBar() {
+		const subProgressContainer = document.querySelector(".sub-progress-container");
+		if (subProgressContainer) {
+			subProgressContainer.style.display = "flex";
+		}
+	}
+
 	// Función para mostrar el popup con estado de carga
 	showInstancePopupWithLoading() {
 		let instancePopup = document.querySelector(".instance-popup");
@@ -2942,6 +3562,68 @@ ${error.message}`,
 		
 		// Mostrar el grid de instancias reales
 		instancesGrid.style.display = "grid";
+	}
+
+	/**
+	 * Método para configurar logging avanzado de eventos del launcher
+	 * Proporciona información detallada sobre el estado del launcher para diagnóstico
+	 */
+	setupAdvancedEventLogging(launcher) {
+		// Log de rendimiento para medir tiempos de las operaciones
+		const performanceMetrics = {
+			startTime: null,
+			downloadStart: null,
+			extractStart: null,
+			gameStart: null
+		};
+
+		// Interceptar todos los eventos para logging centralizado
+		const originalEmit = launcher.emit;
+		launcher.emit = function(event, ...args) {
+			const timestamp = new Date().toISOString();
+			
+			// Log detallado de eventos para debugging
+			if (event === 'progress' && args[0] && typeof args[0] === 'object') {
+				const progress = args[0];
+				console.log(`🔄 [${timestamp}] PROGRESS: ${progress.type} - ${progress.task} (${progress.current}/${progress.total}) - ${progress.message}`);
+			} else if (event === 'download-status') {
+				const status = args[0];
+				console.log(`⬇️ [${timestamp}] DOWNLOAD: ${status.name} (${status.type}) - ${status.percentage?.toFixed(1) || 'N/A'}%`);
+			} else if (event === 'minecraft-started') {
+				performanceMetrics.gameStart = Date.now();
+				const totalTime = performanceMetrics.gameStart - (performanceMetrics.startTime || performanceMetrics.gameStart);
+				console.log(`🎮 [${timestamp}] MINECRAFT INICIADO: PID ${args[0].pid} (Tiempo total: ${totalTime}ms)`);
+			} else if (event === 'error') {
+				const error = args[0];
+				console.error(`❌ [${timestamp}] ERROR: ${error.type || 'unknown'} - ${error.message || error.error || 'Sin mensaje'}`);
+			} else if (event === 'debug') {
+				console.log(`🔧 [${timestamp}] DEBUG: ${args[0]}`);
+			} else {
+				console.log(`📡 [${timestamp}] EVENT: ${event}`, args.length > 0 ? args : '');
+			}
+
+			// Llamar al emit original
+			return originalEmit.apply(this, [event, ...args]);
+		};
+
+		// Métricas de inicio
+		performanceMetrics.startTime = Date.now();
+
+		return performanceMetrics;
+	}
+
+	/**
+	 * Método para obtener estadísticas del launcher
+	 * Útil para diagnóstico y métricas de rendimiento
+	 */
+	getLauncherStats() {
+		return {
+			isGameRunning: playing,
+			currentInstance: this.config?.instance_selct || 'none',
+			rpcActive: rpcActive,
+			timestamp: new Date().toISOString(),
+			memoryUsage: process.memoryUsage ? process.memoryUsage() : 'N/A'
+		};
 	}
 }
 export default Home;

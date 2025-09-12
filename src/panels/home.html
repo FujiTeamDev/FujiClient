@@ -3,8 +3,8 @@
         <div class="message-container">
             <img  class="message-icon" src="assets/images/default/steve.png">
             <div class="message-text">
-                <div class="message-title" data-translate="notifications.notification">Notificación</div>
-                <div class="message-content" data-translate="messages.error_occurred">Esto no deberías de estar viendolo</div> 
+                <div class="message-title">Notificación</div>
+                <div class="message-content">Esto no deberías de estar viendolo</div> 
             </div>
         </div>
         <div class="status-server">
@@ -45,17 +45,6 @@
                         </div>
                         </div>
                     </div>
-                    <div class="news-blockshop" hidden>    
-                        <div class="news-header">
-                            <div class="header-text">
-                                <div class="titleshop">Fuji Team Store</div>
-                            </div>
-                        </div>
-                        <div class="news-content">                        <div class="bbWrapper">
-                            <p><a class="storebutton" data-translate="home.access_store">Acceder a la tienda</a></p>
-                        </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -65,6 +54,9 @@
             </div>
             <div class="social-block" data-url="https://github.com/miguelkix30">
                 <div class="icon-github icon-social"></div>
+            </div>
+            <div class="social-block" id="shop" data-url="" hidden>
+                <i class="fa-solid fa-shop"></i>
             </div>
             <!-- <div class="social-block" data-url="https://www.youtube.com/">
                 <div class="icon-youtube icon-social"></div>
@@ -77,6 +69,10 @@
             <div class="info-starting-game">
                 <div class="info-starting-game-text" data-translate="home.connecting">Conectando...</div>
                 <progress value="0" max="0" class="progress-bar"></progress>
+                <div class="sub-progress-container" style="display: none;">
+                    <div class="sub-progress-text">Descargando archivo...</div>
+                    <progress value="0" max="100" class="sub-progress-bar"></progress>
+                </div>
             </div>
         </div>
     </div>

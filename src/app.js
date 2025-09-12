@@ -1,5 +1,5 @@
 const { app, ipcMain, BrowserWindow } = require('electron');
-const { Authenticator } = require('minecraft-launcher-core');
+const { Authenticator } = require('miguelkinetworkmclauncher-core');
 const { autoUpdater } = require('electron-updater');
 const pkg = require('../package.json');
 const path = require('path');
@@ -574,7 +574,7 @@ ipcMain.handle('get-launcher-config', async (event, options) => {
         // Asegurar que la configuración tenga el gameDirectory correcto
         if (!launchConfig.gameDirectory && !launchConfig.directory) {
             console.log('Configuración sin gameDirectory, estableciendo basado en rootPath');
-            // Para minecraft-launcher-core, necesitamos establecer el gameDirectory
+            // Para miguelkinetworkmclauncher-core, necesitamos establecer el gameDirectory
             launchConfig.gameDirectory = rootPath;
         }
         
@@ -752,33 +752,6 @@ ipcMain.handle('validate-launcher-config', async (event, options) => {
 ipcMain.on('main-window-hide', () => MainWindow.getWindow().hide());
 ipcMain.on('main-window-show', () => MainWindow.getWindow().show());
 
-ipcMain.on('create-store-window', () => {
-    let storewin = new BrowserWindow({
-        width: 1280,
-        height: 795,
-        minimizable: false,
-        maximizable: false,
-        resizable: false,
-        webPreferences: {
-            nodeIntegration: true,
-        }
-    });
-    storewin.loadURL(pkg.store_url);
-});
-
-ipcMain.on('create-skin-window', () => {
-    let skinwin = new BrowserWindow({
-        width: 500,
-        height: 800,
-        minimizable: false,
-        maximizable: false,
-        resizable: false,
-        webPreferences: {
-            nodeIntegration: true,
-        }
-    });
-    skinwin.loadURL(pkg.azuriom_url + 'skin-api');
-});
 
 ipcMain.on('create-register-window', () => {
     let registerWin = new BrowserWindow({
