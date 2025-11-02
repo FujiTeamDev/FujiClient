@@ -1,9 +1,9 @@
 {
     "name": "Fuji-Client",
     "productname": "Fuji Client",
-    "version": "1.0.7",
+    "version": "1.0.8",
     "sub_version": "",
-    "changelog": "Mejoras en el sistema de descarga de java",
+    "changelog": "Arreglo de bugs y mejoras de rendimiento",
     "description": "Launcher de minecraft para los servidores de Fuji Team",
     "main": "src/app.js",
     "author": {
